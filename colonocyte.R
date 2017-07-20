@@ -58,8 +58,8 @@ for(e in ex@react_id){
   else recon <- changeBounds(recon, react = e, lb = 0, ub = 1000)
 }
 
-#recon <- readRDS("~/uni/dat/mod/r/recon2_2_corrected.RDS")
-recon <- tissue
+recon <- readRDS("~/uni/dat/mod/r/recon2_2_corrected.RDS")
+#recon <- tissue
 
 uptake  <- c("EX_but(e)", "EX_glc(e)", "EX_h2o(e)", "EX_na1(e)", "EX_gln_L(e)")
 product <- c("EX_co2(e)", "EX_lac_D(e)", "EX_lac_L(e)" ,"EX_cl(e)", "EX_bhb(e)", "EX_acac(e)", "EX_acetone(e)", "EX_hco3(e)", "EX_k(e)")
@@ -69,10 +69,10 @@ for(s in c(uptake, product)){
   else recon <- changeBounds(recon, react = s, lb = 0, ub = 1000)
 }
 
-recon <- changeBounds(recon, react = "EX_glc(e)", lb = -1, ub = 1000)
-recon <- changeBounds(recon, react = "EX_but(e)", lb = -1, ub = 1000)
-recon <- changeBounds(recon, react = "EX_bhb(e)", lb = -1, ub = 1000) # hydroxybutyrate can also be substrate
-recon <- changeBounds(recon, react = "EX_gln_L(e)",lb= -1, ub = 1000) # hydroxybutyrate can also be substrate
+recon <- changeBounds(recon, react = "EX_glc(e)", lb = -0, ub = 1000)
+recon <- changeBounds(recon, react = "EX_but(e)", lb = -0, ub = 1000)
+recon <- changeBounds(recon, react = "EX_bhb(e)", lb = -0, ub = 1000) # hydroxybutyrate can also be substrate
+recon <- changeBounds(recon, react = "EX_gln_L(e)",lb= -0, ub = 1000) # hydroxybutyrate can also be substrate
 
 recon <- changeBounds(recon, react = "EX_hx(e)", lb = 0, ub = 1000) # hexanoate ~fe2/3 p+ shuffle bug
 recon <- changeBounds(recon, react = "EX_fe2(e)", lb = -1, ub = 1000) # limit fe/3 p+ shuffle bug
@@ -81,7 +81,7 @@ recon <- changeBounds(recon, react = "EX_fe2(e)", lb = -1, ub = 1000) # limit fe
 recon <- changeBounds(recon, react = "EX_lnlc(e)", lb = 0, ub = 1000) # fatty acids not necessay
 recon <- changeBounds(recon, react = "EX_lnlnca(e)", lb = 0, ub = 1000) # fatty acids not necessay
  
-#ex <- findExchReact(recon)
+ex <- findExchReact(recon)
 #ex[which(ex@react_id=="EX_but(e)"),]
 sol <- optimizeProb(recon)
 sol
@@ -118,6 +118,11 @@ exch[match(sub, ex@react_id)]
 ex[match(c(pro,sub), ex@react_id),]
 
 
+
+#
+# recon22 model update
+#
+
 # fix recon 2.2 (exchange reactions other way around defined)
 ex <- findExchReact(recon)
 ex2 <- ex[grep("^EX_", ex@react_id),]
@@ -128,3 +133,36 @@ for(i in 1:length(ex2@met_id)){
 lb <- recon@lowbnd[ex2@react_pos]; ub <- recon@uppbnd[ex2@react_pos]
 recon@lowbnd[ex2@react_pos] <- -ub; recon@uppbnd[ex2@react_pos] <- -lb
 # saveRDS(recon, "r/recon2_2_corrected.RDS")
+
+# add u compartment
+ex <- findExchReact(recon)
+ex <- ex[grep("^EX_", ex@react_id),]
+for(i in seq_along(ex@react_id)){
+  rea <- gsub("\\(e\\)","\\(u\\)",ex@react_id[i])
+  met <- ex@met_id[i]
+  ub  <- ex@uppbnd[i]
+  lb  <- ex@lowbnd[i]
+  recon <- addReact(recon, id=rea, met = met, Scoef = -1, reversible = T, ub = ub, lb=lb)
+}
+# saveRDS(recon, "~/uni/dat/mod/r/recon2_2_updated.RDS")
+
+recon <- readRDS("~/uni/dat/mod/r/recon2_2_updated.RDS")
+
+ex <- findExchReact(recon)
+ex <- ex[grep("^EX_.*\\(e\\)$", ex@react_id),]
+lowbnd(recon)[ex@react_pos] <- 0
+optimizeProb(recon)
+
+c("EX_o2(e)", EX_fe2(u),,EX_h(u),EX_his_L(u),EX_ile_L(u),EX_leu_L(u),EX_lys_L(u),EX_met_L(u),EX_phe_L(u),
+EX_pi(u),EX_thr_L(u),EX_trp_L(u),EX_val_L(u))
+
+
+
+sol  <- optimizeProb(recon) # retOptSol=F
+exch <- getFluxDist(sol, findExchReact(recon))
+flux <- getNetFlux(exch)
+exch[flux@uptake]
+exch[flux@product]
+
+
+printReaction(recon, react="EX_glc(u)")
